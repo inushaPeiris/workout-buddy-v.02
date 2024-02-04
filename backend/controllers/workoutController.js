@@ -1,6 +1,8 @@
-const Workout = require("../models/workoutModel");
-const mongoose = require("mongoose");
 const connect = require("../db");
+
+// ------ to be removed
+// const Workout = require("../models/workoutModel");
+// const mongoose = require("mongoose");
 
 // get all workouts
 const getWorkouts = async (req, res) => {
@@ -16,37 +18,43 @@ const getWorkouts = async (req, res) => {
 };
 
 const getWorkout = async (req, res) => {
-  const { id } = req.params;
+  const exerciseId = req.params.id; // Extracting exercise ID from URL parameter
 
-  try {
-    // Query the database to get the workout with the provided ID
-    const query = "SELECT * FROM your_table WHERE id = ?";
-    const workout = await connect.connection.query(query, [id]);
+  // Query database to get exercise with the specified ID
+  connect.connection.query(
+    "SELECT * FROM exercises WHERE id = ?",
+    [exerciseId],
+    (err, result) => {
+      if (err) {
+        console.error("Error executing query:", err);
+        res.status(500).json({ error: "Database error" });
+        return;
+      }
 
-    // Check if the workout with the provided ID exists
-    if (workout.length === 0) {
-      return res.status(404).json({ error: "Workout not found" });
+      // Check if exercise with the given ID exists
+      if (result.length === 0) {
+        res.status(404).json({ error: "Exercise not found" });
+        return;
+      }
+
+      // Return the exercise
+      res.status(200).json(result[0]);
     }
-
-    // Send the workout data in the response
-    res.status(200).json(workout);
-  } catch (error) {
-    console.error("Error retrieving workout:", error);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
+  );
 };
 
 // post a new workout
 const createWorkout = async (req, res) => {
-  const { title, reps, load } = req.body;
+  console.log("Request body:", req.body); // Log the request body
+  const { title, weight, reps } = req.body;
 
   let emptyFields = [];
 
   if (!title) {
     emptyFields.push("title");
   }
-  if (!load) {
-    emptyFields.push("load");
+  if (!weight) {
+    emptyFields.push("weight");
   }
   if (!reps) {
     emptyFields.push("reps");
@@ -57,14 +65,20 @@ const createWorkout = async (req, res) => {
       .json({ error: "Please fill in all fields", emptyFields });
   }
 
-  // add doc to db
-  try {
-    // pause the function untill database operation is done
-    const workout = await Workout.create({ title, reps, load });
-    res.status(200).json(workout);
-  } catch (error) {
-    res.status(400).json({ error: error.message });
-  }
+  // Insert new workout into the database
+  connect.connection.query(
+    "INSERT INTO exercises (title, weight,reps) VALUES (?, ?, ?)",
+    [title, weight, reps],
+    (err, result) => {
+      if (err) {
+        console.error("Error executing query:", err);
+        res.status(500).json({ error: "Database error" });
+        return;
+      }
+      const workout = { id: result.insertId, title, weight, reps }; // get the data of new workout
+      res.status(200).json(workout);
+    }
+  );
 };
 
 // delete a workout
